@@ -13,6 +13,7 @@ const sessionSummary = document.getElementById("sessionSummary");
 const activeSessionCode = document.getElementById("activeSessionCode");
 const copySessionBtn = document.getElementById("copySessionBtn");
 const changeSessionBtn = document.getElementById("changeSessionBtn");
+const nameJoinRow = document.getElementById("nameJoinRow");
 const nameInput = document.getElementById("nameInput");
 const joinBtn = document.getElementById("joinBtn");
 const colorsBox = document.getElementById("colors");
@@ -481,6 +482,7 @@ function updateSessionUi(options = {}) {
   if (!sessionId) {
     sessionRow.hidden = false;
     sessionSummary.hidden = true;
+    nameJoinRow.hidden = true;
     activeSessionCode.textContent = "";
     return;
   }
@@ -488,6 +490,7 @@ function updateSessionUi(options = {}) {
   activeSessionCode.textContent = sessionId;
   sessionSummary.hidden = false;
   sessionRow.hidden = compact;
+  nameJoinRow.hidden = false;
 }
 
 function normalizeSessionId(value) {
