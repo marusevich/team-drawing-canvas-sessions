@@ -8,9 +8,11 @@ const joinScreen = document.getElementById("joinScreen");
 const gameScreen = document.getElementById("gameScreen");
 const sessionInput = document.getElementById("sessionInput");
 const createSessionBtn = document.getElementById("createSessionBtn");
-const sessionTools = document.getElementById("sessionTools");
+const sessionRow = document.querySelector(".session-row");
+const sessionSummary = document.getElementById("sessionSummary");
+const activeSessionCode = document.getElementById("activeSessionCode");
 const copySessionBtn = document.getElementById("copySessionBtn");
-const sessionLink = document.getElementById("sessionLink");
+const changeSessionBtn = document.getElementById("changeSessionBtn");
 const nameInput = document.getElementById("nameInput");
 const joinBtn = document.getElementById("joinBtn");
 const colorsBox = document.getElementById("colors");
@@ -63,20 +65,27 @@ COLORS.forEach((color, index) => {
 
 if (sessionId) {
   sessionInput.value = sessionId;
-  updateSessionLink();
+  updateSessionUi();
 }
 
 sessionInput.addEventListener("input", () => {
   sessionId = normalizeSessionId(sessionInput.value);
-  updateSessionLink();
+  updateSessionUi({ compact: false });
 });
 
 createSessionBtn.addEventListener("click", () => {
   sessionId = createSessionId();
   sessionInput.value = sessionId;
   writeSessionToUrl(sessionId);
-  updateSessionLink();
+  updateSessionUi();
   nameInput.focus();
+});
+
+changeSessionBtn.addEventListener("click", () => {
+  sessionRow.hidden = false;
+  sessionSummary.hidden = true;
+  sessionInput.disabled = false;
+  sessionInput.focus();
 });
 
 copySessionBtn.addEventListener("click", async () => {
@@ -117,7 +126,7 @@ async function join() {
 
   myName = name;
   writeSessionToUrl(sessionId);
-  updateSessionLink();
+  updateSessionUi();
   joinBtn.disabled = true;
   createSessionBtn.disabled = true;
   sessionInput.disabled = true;
@@ -466,16 +475,19 @@ function buildSessionUrl(value) {
   return url.toString();
 }
 
-function updateSessionLink() {
+function updateSessionUi(options = {}) {
+  const compact = options.compact !== false;
+
   if (!sessionId) {
-    sessionTools.hidden = true;
-    sessionLink.textContent = "";
+    sessionRow.hidden = false;
+    sessionSummary.hidden = true;
+    activeSessionCode.textContent = "";
     return;
   }
 
-  const link = buildSessionUrl(sessionId);
-  sessionTools.hidden = false;
-  sessionLink.textContent = link;
+  activeSessionCode.textContent = sessionId;
+  sessionSummary.hidden = false;
+  sessionRow.hidden = compact;
 }
 
 function normalizeSessionId(value) {

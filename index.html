@@ -48,13 +48,12 @@
     border: 1px solid var(--border); border-radius: 8px; outline: none;
   }
   .join-screen input:focus, .session-row input:focus { border-color: var(--accent); }
-  .session-tools {
+  .session-summary {
     display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-    color: var(--muted); font-size: 13px;
+    padding: 10px 12px; background: #fafbff; border: 1px solid var(--border);
+    border-radius: 8px; color: var(--muted); font-size: 13px;
   }
-  .session-link {
-    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  }
+  .session-summary strong { color: var(--text); }
   button {
     cursor: pointer; border: none; border-radius: 8px;
     padding: 10px 14px; font-size: 14px; font-weight: 500;
@@ -143,9 +142,10 @@
       <input id="sessionInput" type="text" placeholder="Session code" maxlength="40" />
       <button id="createSessionBtn" class="secondary">New session</button>
     </div>
-    <div class="session-tools" id="sessionTools" hidden>
+    <div class="session-summary" id="sessionSummary" hidden>
+      <span>Session: <strong id="activeSessionCode"></strong></span>
       <button id="copySessionBtn" class="secondary">Copy link</button>
-      <span class="session-link" id="sessionLink"></span>
+      <button id="changeSessionBtn" class="secondary">Change</button>
     </div>
     <div class="join-screen">
       <input id="nameInput" type="text" placeholder="Your name…" maxlength="30" autofocus />
