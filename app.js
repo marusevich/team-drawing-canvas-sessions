@@ -176,7 +176,7 @@ async function join() {
 
 function syncFromStorage() {
   if (!root || !strokesList) return;
-  strokes = strokesList.toImmutable();
+  strokes = liveListToArray(strokesList);
   currentTurnIndex = Number(root.get("currentTurnIndex")) || 0;
   strokeCountEl.textContent = strokes.length;
   refreshPlayers();
@@ -433,6 +433,14 @@ function escapeHtml(value) {
     '"': "&quot;",
     "'": "&#39;",
   })[char]);
+}
+
+function liveListToArray(list) {
+  const items = [];
+  for (let index = 0; index < list.length; index += 1) {
+    items.push(list.get(index));
+  }
+  return items;
 }
 
 function createSessionId() {
