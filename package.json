@@ -1,7 +1,7 @@
 {
-  "name": "team-drawing-canvas",
+  "name": "team-drawing-canvas-sessions",
   "version": "1.0.0",
-  "description": "Multiplayer turn-based drawing canvas for team events. Players take turns drawing one stroke each on a shared canvas, synced with Liveblocks.",
+  "description": "Session-based multiplayer drawing canvas for team events, synced with Liveblocks.",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"

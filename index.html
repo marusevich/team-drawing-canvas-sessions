@@ -41,12 +41,20 @@
   .subtitle { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
 
   /* Join screen */
-  .join-screen { display: flex; gap: 8px; }
-  .join-screen input {
+  .setup { display: flex; flex-direction: column; gap: 10px; }
+  .join-screen, .session-row { display: flex; gap: 8px; }
+  .join-screen input, .session-row input {
     flex: 1; padding: 10px 12px; font-size: 15px;
     border: 1px solid var(--border); border-radius: 8px; outline: none;
   }
-  .join-screen input:focus { border-color: var(--accent); }
+  .join-screen input:focus, .session-row input:focus { border-color: var(--accent); }
+  .session-tools {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    color: var(--muted); font-size: 13px;
+  }
+  .session-link {
+    max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
   button {
     cursor: pointer; border: none; border-radius: 8px;
     padding: 10px 14px; font-size: 14px; font-weight: 500;
@@ -130,9 +138,19 @@
   <p class="subtitle">Each player draws one stroke at a time. Goal — draw a cat together.</p>
 
   <!-- Join screen -->
-  <div class="join-screen" id="joinScreen">
-    <input id="nameInput" type="text" placeholder="Your name…" maxlength="30" autofocus />
-    <button id="joinBtn">Join</button>
+  <div class="setup" id="joinScreen">
+    <div class="session-row">
+      <input id="sessionInput" type="text" placeholder="Session code" maxlength="40" />
+      <button id="createSessionBtn" class="secondary">New session</button>
+    </div>
+    <div class="session-tools" id="sessionTools" hidden>
+      <button id="copySessionBtn" class="secondary">Copy link</button>
+      <span class="session-link" id="sessionLink"></span>
+    </div>
+    <div class="join-screen">
+      <input id="nameInput" type="text" placeholder="Your name…" maxlength="30" autofocus />
+      <button id="joinBtn">Join</button>
+    </div>
   </div>
 
   <!-- Game screen -->
@@ -155,6 +173,7 @@
 
     <div class="status-bar">
       <div class="turn-info" id="turnInfo">…</div>
+      <div>Session: <strong id="sessionCodeLabel">…</strong></div>
       <div>Strokes: <strong id="strokeCount">0</strong></div>
     </div>
 

@@ -1,11 +1,16 @@
 import { createClient, LiveList } from "https://esm.sh/@liveblocks/client?bundle";
 
 const LIVEBLOCKS_PUBLIC_KEY = "pk_dev_fIzmJAtF9NWVLJO_NwwXNfDPlUX4hw0fYlA7XlrRMOiyidVQ1by_QyHbUJ91wP_g";
-const ROOM_ID = "team-drawing-canvas-cat";
+const ROOM_PREFIX = "team-drawing-canvas-cat";
 const COLORS = ["#1c1e26", "#e25c5c", "#ee9c3a", "#2bb673", "#3d8de0", "#a64cd2"];
 
 const joinScreen = document.getElementById("joinScreen");
 const gameScreen = document.getElementById("gameScreen");
+const sessionInput = document.getElementById("sessionInput");
+const createSessionBtn = document.getElementById("createSessionBtn");
+const sessionTools = document.getElementById("sessionTools");
+const copySessionBtn = document.getElementById("copySessionBtn");
+const sessionLink = document.getElementById("sessionLink");
 const nameInput = document.getElementById("nameInput");
 const joinBtn = document.getElementById("joinBtn");
 const colorsBox = document.getElementById("colors");
@@ -16,6 +21,7 @@ const ctx = canvas.getContext("2d");
 const lockBanner = document.getElementById("lockBanner");
 const lockText = document.getElementById("lockText");
 const turnInfo = document.getElementById("turnInfo");
+const sessionCodeLabel = document.getElementById("sessionCodeLabel");
 const strokeCountEl = document.getElementById("strokeCount");
 const playersBox = document.getElementById("players");
 const doneBtn = document.getElementById("doneBtn");
@@ -32,6 +38,8 @@ let myName = "";
 let players = [];
 let currentTurnIndex = 0;
 let currentTurnPlayerId = null;
+let previousTurnPlayerId = null;
+let sessionId = readSessionFromUrl();
 let strokes = [];
 let activeStroke = null;
 let myColor = COLORS[0];
@@ -53,6 +61,36 @@ COLORS.forEach((color, index) => {
   colorsBox.appendChild(swatch);
 });
 
+if (sessionId) {
+  sessionInput.value = sessionId;
+  updateSessionLink();
+}
+
+sessionInput.addEventListener("input", () => {
+  sessionId = normalizeSessionId(sessionInput.value);
+  updateSessionLink();
+});
+
+createSessionBtn.addEventListener("click", () => {
+  sessionId = createSessionId();
+  sessionInput.value = sessionId;
+  writeSessionToUrl(sessionId);
+  updateSessionLink();
+  nameInput.focus();
+});
+
+copySessionBtn.addEventListener("click", async () => {
+  if (!sessionId) return;
+  const link = buildSessionUrl(sessionId);
+  try {
+    await navigator.clipboard.writeText(link);
+    copySessionBtn.textContent = "Copied";
+    setTimeout(() => { copySessionBtn.textContent = "Copy link"; }, 1200);
+  } catch {
+    window.prompt("Copy this link", link);
+  }
+});
+
 brushSize.addEventListener("input", () => {
   myBrush = Number(brushSize.value);
   brushSizeLabel.textContent = myBrush;
@@ -65,13 +103,24 @@ nameInput.addEventListener("keydown", event => {
 
 async function join() {
   const name = nameInput.value.trim();
+  sessionId = normalizeSessionId(sessionInput.value);
+
+  if (!sessionId) {
+    sessionInput.focus();
+    return;
+  }
+
   if (!name) {
     nameInput.focus();
     return;
   }
 
   myName = name;
+  writeSessionToUrl(sessionId);
+  updateSessionLink();
   joinBtn.disabled = true;
+  createSessionBtn.disabled = true;
+  sessionInput.disabled = true;
   joinBtn.textContent = "Joining…";
 
   try {
@@ -80,7 +129,7 @@ async function join() {
       throttle: 32,
     });
 
-    const entered = client.enterRoom(ROOM_ID, {
+    const entered = client.enterRoom(`${ROOM_PREFIX}-${sessionId}`, {
       initialPresence: { name: myName },
       initialStorage: {
         strokes: new LiveList([]),
@@ -91,6 +140,7 @@ async function join() {
     room = entered.room;
     joinScreen.style.display = "none";
     gameScreen.classList.add("active");
+    sessionCodeLabel.textContent = sessionId;
     turnInfo.textContent = "Connecting…";
 
     room.subscribe("status", status => {
@@ -117,6 +167,8 @@ async function join() {
   } catch (error) {
     console.error(error);
     joinBtn.disabled = false;
+    createSessionBtn.disabled = false;
+    sessionInput.disabled = false;
     joinBtn.textContent = "Join";
     alert("Could not connect to Liveblocks. Check the public key and project settings.");
   }
@@ -155,6 +207,11 @@ function refreshPlayers() {
 
   players = nextPlayers.sort((a, b) => a.id - b.id);
   currentTurnPlayerId = players.length ? players[currentTurnIndex % players.length].id : null;
+
+  if (currentTurnPlayerId !== previousTurnPlayerId) {
+    previousTurnPlayerId = currentTurnPlayerId;
+    didStroke = false;
+  }
 }
 
 function handleLiveblocksEvent(event) {
@@ -311,7 +368,9 @@ clearBtn.addEventListener("click", () => {
   if (!strokesList || !room) return;
   if (!confirm("Clear everything?")) return;
 
-  strokesList.clear();
+  while (strokesList.length > 0) {
+    strokesList.delete(strokesList.length - 1);
+  }
   activeStroke = null;
   didStroke = false;
   room.broadcastEvent({ type: "stroke_cancel" });
@@ -374,4 +433,49 @@ function escapeHtml(value) {
     '"': "&quot;",
     "'": "&#39;",
   })[char]);
+}
+
+function createSessionId() {
+  const bytes = new Uint8Array(4);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function readSessionFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return normalizeSessionId(params.get("session") || "");
+}
+
+function writeSessionToUrl(value) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("session", value);
+  window.history.replaceState({}, "", url);
+}
+
+function buildSessionUrl(value) {
+  const url = new URL(window.location.href);
+  url.searchParams.set("session", value);
+  return url.toString();
+}
+
+function updateSessionLink() {
+  if (!sessionId) {
+    sessionTools.hidden = true;
+    sessionLink.textContent = "";
+    return;
+  }
+
+  const link = buildSessionUrl(sessionId);
+  sessionTools.hidden = false;
+  sessionLink.textContent = link;
+}
+
+function normalizeSessionId(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "")
+    .slice(0, 40);
 }
