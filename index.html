@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Team Drawing Canvas 🚀</title>
+<title>Team Drawing Canvas 🐱</title>
 <style>
   :root {
     --bg: #f6f7fb;
@@ -126,8 +126,8 @@
 </head>
 <body>
 <div class="app">
-  <h1>🚀 Team Drawing Canvas</h1>
-  <p class="subtitle">Each player draws one stroke at a time. Goal — draw a rocket together.</p>
+  <h1>🐱 Team Drawing Canvas</h1>
+  <p class="subtitle">Each player draws one stroke at a time. Goal — draw a cat together.</p>
 
   <!-- Join screen -->
   <div class="join-screen" id="joinScreen">
@@ -430,7 +430,7 @@
   });
   saveBtn.addEventListener('click', () => {
     const link = document.createElement('a');
-    link.download = `rocket-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.png`;
+    link.download = `cat-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.png`;
     link.href = canvas.toDataURL('image/png');
     link.click();
   });

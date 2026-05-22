@@ -277,7 +277,7 @@ function onClose(ws) {
 
 // =================== Start ===================
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🚀 Drawing canvas server is running.`);
+  console.log(`\n🐱 Drawing canvas server is running.`);
   console.log(`   Local:    http://localhost:${PORT}`);
   const ifaces = require('os').networkInterfaces();
   for (const name of Object.keys(ifaces)) {

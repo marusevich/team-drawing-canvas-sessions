@@ -1,10 +1,10 @@
-# 🚀 Team Drawing Canvas
+# 🐱 Team Drawing Canvas
 
 A multiplayer, turn-based drawing canvas for team events. Players take turns drawing
 one stroke each on a shared canvas. Updates sync in real time over WebSocket.
 
 Built for a company anniversary: a team of 3–5 people opens a shared link, takes turns
-adding one stroke each, and together draws a rocket.
+adding one stroke each, and together draws a cat.
 
 ## Stack
 
