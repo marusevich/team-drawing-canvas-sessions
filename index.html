@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Team Drawing Canvas 🚀</title>
+<style>
+  :root {
+    --bg: #f6f7fb;
+    --panel: #ffffff;
+    --border: #e4e6ef;
+    --text: #1c1e26;
+    --muted: #6b7280;
+    --accent: #5b6cff;
+    --accent-dark: #3d4be0;
+    --danger: #e25c5c;
+    --ok: #2bb673;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .app {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 24px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.06);
+    width: 100%;
+    max-width: 760px;
+  }
+  h1 { margin: 0 0 4px; font-size: 22px; }
+  .subtitle { color: var(--muted); margin: 0 0 18px; font-size: 14px; }
+
+  /* Join screen */
+  .join-screen { display: flex; gap: 8px; }
+  .join-screen input {
+    flex: 1; padding: 10px 12px; font-size: 15px;
+    border: 1px solid var(--border); border-radius: 8px; outline: none;
+  }
+  .join-screen input:focus { border-color: var(--accent); }
+  button {
+    cursor: pointer; border: none; border-radius: 8px;
+    padding: 10px 14px; font-size: 14px; font-weight: 500;
+    background: var(--accent); color: white; transition: background 0.15s;
+  }
+  button:hover:not(:disabled) { background: var(--accent-dark); }
+  button:disabled { background: #cdd0e1; cursor: not-allowed; }
+  button.secondary { background: #ececf4; color: var(--text); }
+  button.secondary:hover:not(:disabled) { background: #dcdde8; }
+  button.danger { background: var(--danger); }
+  button.danger:hover:not(:disabled) { background: #c54545; }
+  button.ok { background: var(--ok); }
+  button.ok:hover:not(:disabled) { background: #229960; }
+
+  /* Game screen */
+  .game { display: none; flex-direction: column; gap: 14px; }
+  .game.active { display: flex; }
+
+  .toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+    padding: 12px; background: #fafbff; border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .toolbar label { font-size: 13px; color: var(--muted); }
+  .colors { display: flex; gap: 6px; }
+  .swatch {
+    width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+    border: 2px solid transparent; transition: transform 0.1s;
+  }
+  .swatch:hover { transform: scale(1.1); }
+  .swatch.active { border-color: var(--text); }
+  .brush-control { display: flex; align-items: center; gap: 8px; }
+  .brush-control input[type=range] { width: 100px; }
+
+  .stage {
+    position: relative;
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+    width: 600px; height: 400px; max-width: 100%;
+    background: white; margin: 0 auto;
+  }
+  canvas { display: block; cursor: crosshair; touch-action: none; }
+  canvas.locked { cursor: not-allowed; }
+
+  .lock-banner {
+    position: absolute; inset: 0; display: none;
+    align-items: center; justify-content: center; pointer-events: none;
+    background: rgba(255,255,255,0.0);
+  }
+  .lock-banner.visible { display: flex; }
+  .lock-banner span {
+    background: rgba(28,30,38,0.85); color: white;
+    padding: 8px 14px; border-radius: 20px; font-size: 13px;
+  }
+
+  .status-bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 12px;
+    justify-content: space-between; font-size: 14px;
+  }
+  .turn-info { color: var(--muted); }
+  .turn-info strong { color: var(--text); }
+  .my-turn { color: var(--ok); font-weight: 600; }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  .players {
+    display: flex; flex-wrap: wrap; gap: 6px;
+    font-size: 13px; color: var(--muted);
+  }
+  .players .pill {
+    background: #ececf4; padding: 4px 10px; border-radius: 12px;
+  }
+  .players .pill.current {
+    background: var(--accent); color: white;
+  }
+  .players .pill.me::after { content: " (you)"; opacity: 0.7; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🚀 Team Drawing Canvas</h1>
+  <p class="subtitle">Each player draws one stroke at a time. Goal — draw a rocket together.</p>
+
+  <!-- Join screen -->
+  <div class="join-screen" id="joinScreen">
+    <input id="nameInput" type="text" placeholder="Your name…" maxlength="30" autofocus />
+    <button id="joinBtn">Join</button>
+  </div>
+
+  <!-- Game screen -->
+  <div class="game" id="gameScreen">
+    <div class="toolbar">
+      <div class="colors" id="colors">
+        <!-- color swatches injected by JS -->
+      </div>
+      <div class="brush-control">
+        <label>Brush</label>
+        <input id="brushSize" type="range" min="2" max="24" value="6" />
+        <span id="brushSizeLabel">6</span>
+      </div>
+    </div>
+
+    <div class="stage">
+      <canvas id="canvas" width="600" height="400"></canvas>
+      <div class="lock-banner" id="lockBanner"><span id="lockText">Waiting for your turn…</span></div>
+    </div>
+
+    <div class="status-bar">
+      <div class="turn-info" id="turnInfo">…</div>
+      <div>Strokes: <strong id="strokeCount">0</strong></div>
+    </div>
+
+    <div class="players" id="players"></div>
+
+    <div class="actions">
+      <button id="doneBtn" class="ok" disabled>Done — pass it on</button>
+      <button id="undoBtn" class="secondary">Undo</button>
+      <button id="clearBtn" class="danger">Clear all</button>
+      <button id="saveBtn" class="secondary">💾 Save image</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const COLORS = ['#1c1e26', '#e25c5c', '#ee9c3a', '#2bb673', '#3d8de0', '#a64cd2'];
+
+  // --- DOM ---
+  const joinScreen = document.getElementById('joinScreen');
+  const gameScreen = document.getElementById('gameScreen');
+  const nameInput  = document.getElementById('nameInput');
+  const joinBtn    = document.getElementById('joinBtn');
+  const colorsBox  = document.getElementById('colors');
+  const brushSize  = document.getElementById('brushSize');
+  const brushSizeLabel = document.getElementById('brushSizeLabel');
+  const canvas     = document.getElementById('canvas');
+  const ctx        = canvas.getContext('2d');
+  const lockBanner = document.getElementById('lockBanner');
+  const lockText   = document.getElementById('lockText');
+  const turnInfo   = document.getElementById('turnInfo');
+  const strokeCountEl = document.getElementById('strokeCount');
+  const playersBox = document.getElementById('players');
+  const doneBtn    = document.getElementById('doneBtn');
+  const undoBtn    = document.getElementById('undoBtn');
+  const clearBtn   = document.getElementById('clearBtn');
+  const saveBtn    = document.getElementById('saveBtn');
+
+  // --- State ---
+  let ws = null;
+  let myId = null;
+  let myName = '';
+  let players = [];
+  let currentTurnPlayerId = null;
+  let strokes = [];
+  let activeStroke = null;
+  let myColor = COLORS[0];
+  let myBrush = 6;
+  let isDrawing = false;
+  let didStroke = false;
+
+  // --- Color palette ---
+  COLORS.forEach((c, i) => {
+    const s = document.createElement('div');
+    s.className = 'swatch' + (i === 0 ? ' active' : '');
+    s.style.background = c;
+    s.addEventListener('click', () => {
+      document.querySelectorAll('.swatch').forEach(el => el.classList.remove('active'));
+      s.classList.add('active');
+      myColor = c;
+    });
+    colorsBox.appendChild(s);
+  });
+
+  brushSize.addEventListener('input', () => {
+    myBrush = Number(brushSize.value);
+    brushSizeLabel.textContent = myBrush;
+  });
+
+  // --- Join ---
+  joinBtn.addEventListener('click', join);
+  nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') join(); });
+
+  function join() {
+    const name = nameInput.value.trim();
+    if (!name) { nameInput.focus(); return; }
+    myName = name;
+    connect();
+  }
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    ws = new WebSocket(`${proto}//${location.host}`);
+
+    ws.addEventListener('open', () => {
+      ws.send(JSON.stringify({ type: 'join', name: myName }));
+      joinScreen.style.display = 'none';
+      gameScreen.classList.add('active');
+    });
+
+    ws.addEventListener('message', (ev) => {
+      const msg = JSON.parse(ev.data);
+      handleServerMessage(msg);
+    });
+
+    ws.addEventListener('close', () => {
+      turnInfo.textContent = '⚠️ Connection lost. Please reload the page.';
+    });
+  }
+
+  function handleServerMessage(msg) {
+    switch (msg.type) {
+      case 'state': {
+        myId = msg.yourId;
+        players = msg.players;
+        currentTurnPlayerId = msg.currentTurnPlayerId;
+        strokes = msg.strokes;
+        strokeCountEl.textContent = msg.strokeCount;
+        redraw();
+        updateUI();
+        break;
+      }
+      case 'players': {
+        players = msg.players;
+        currentTurnPlayerId = msg.currentTurnPlayerId;
+        updateUI();
+        break;
+      }
+      case 'turn_change': {
+        currentTurnPlayerId = msg.currentTurnPlayerId;
+        didStroke = false;
+        updateUI();
+        break;
+      }
+      case 'stroke_start': {
+        activeStroke = msg.stroke;
+        if (activeStroke.playerId !== myId) {
+          drawStartPoint(activeStroke);
+        }
+        break;
+      }
+      case 'stroke_point': {
+        if (!activeStroke) return;
+        const last = activeStroke.points[activeStroke.points.length - 1];
+        drawSegment(last, { x: msg.x, y: msg.y }, activeStroke.color, activeStroke.width);
+        activeStroke.points.push({ x: msg.x, y: msg.y });
+        break;
+      }
+      case 'stroke_end': {
+        strokes.push(msg.stroke);
+        activeStroke = null;
+        strokeCountEl.textContent = msg.strokeCount;
+        if (msg.stroke.playerId === myId) {
+          didStroke = true;
+          updateUI();
+        }
+        break;
+      }
+      case 'stroke_cancel': {
+        activeStroke = null;
+        redraw();
+        break;
+      }
+      case 'undo': {
+        strokes = msg.strokes;
+        strokeCountEl.textContent = msg.strokeCount;
+        redraw();
+        break;
+      }
+      case 'clear': {
+        strokes = [];
+        activeStroke = null;
+        strokeCountEl.textContent = 0;
+        didStroke = false;
+        redraw();
+        updateUI();
+        break;
+      }
+    }
+  }
+
+  // --- Drawing ---
+  function redraw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const s of strokes) drawWholeStroke(s);
+    if (activeStroke) drawWholeStroke(activeStroke);
+  }
+
+  function drawWholeStroke(s) {
+    if (!s.points.length) return;
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = s.width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    if (s.points.length === 1) {
+      ctx.beginPath();
+      ctx.arc(s.points[0].x, s.points[0].y, s.width / 2, 0, Math.PI * 2);
+      ctx.fillStyle = s.color;
+      ctx.fill();
+      return;
+    }
+    ctx.beginPath();
+    ctx.moveTo(s.points[0].x, s.points[0].y);
+    for (let i = 1; i < s.points.length; i++) {
+      ctx.lineTo(s.points[i].x, s.points[i].y);
+    }
+    ctx.stroke();
+  }
+
+  function drawStartPoint(s) {
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.arc(s.points[0].x, s.points[0].y, s.width / 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function drawSegment(a, b, color, width) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  // --- Input ---
+  function canvasPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const point = e.touches ? e.touches[0] : e;
+    return {
+      x: (point.clientX - rect.left) * (canvas.width / rect.width),
+      y: (point.clientY - rect.top) * (canvas.height / rect.height),
+    };
+  }
+
+  function pointerDown(e) {
+    if (currentTurnPlayerId !== myId) return;
+    if (didStroke) return;
+    if (activeStroke) return;
+    e.preventDefault();
+    isDrawing = true;
+    const p = canvasPos(e);
+    ws.send(JSON.stringify({ type: 'stroke_start', x: p.x, y: p.y, color: myColor, width: myBrush }));
+    activeStroke = { playerId: myId, color: myColor, width: myBrush, points: [p] };
+    drawStartPoint(activeStroke);
+  }
+
+  function pointerMove(e) {
+    if (!isDrawing || !activeStroke) return;
+    e.preventDefault();
+    const p = canvasPos(e);
+    const last = activeStroke.points[activeStroke.points.length - 1];
+    if (Math.abs(p.x - last.x) < 1 && Math.abs(p.y - last.y) < 1) return;
+    drawSegment(last, p, activeStroke.color, activeStroke.width);
+    activeStroke.points.push(p);
+    ws.send(JSON.stringify({ type: 'stroke_point', x: p.x, y: p.y }));
+  }
+
+  function pointerUp(e) {
+    if (!isDrawing) return;
+    isDrawing = false;
+    ws.send(JSON.stringify({ type: 'stroke_end' }));
+  }
+
+  canvas.addEventListener('mousedown', pointerDown);
+  canvas.addEventListener('mousemove', pointerMove);
+  window.addEventListener('mouseup', pointerUp);
+  canvas.addEventListener('touchstart', pointerDown);
+  canvas.addEventListener('touchmove', pointerMove);
+  window.addEventListener('touchend', pointerUp);
+
+  // --- Buttons ---
+  doneBtn.addEventListener('click', () => {
+    ws.send(JSON.stringify({ type: 'pass_turn' }));
+  });
+  undoBtn.addEventListener('click', () => {
+    ws.send(JSON.stringify({ type: 'undo' }));
+  });
+  clearBtn.addEventListener('click', () => {
+    if (confirm('Clear everything?')) ws.send(JSON.stringify({ type: 'clear' }));
+  });
+  saveBtn.addEventListener('click', () => {
+    const link = document.createElement('a');
+    link.download = `rocket-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.png`;
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  });
+
+  // --- UI update ---
+  function updateUI() {
+    const isMyTurn = currentTurnPlayerId === myId;
+
+    playersBox.innerHTML = '';
+    for (const p of players) {
+      const pill = document.createElement('span');
+      pill.className = 'pill';
+      if (p.id === currentTurnPlayerId) pill.classList.add('current');
+      if (p.id === myId) pill.classList.add('me');
+      pill.textContent = p.name;
+      playersBox.appendChild(pill);
+    }
+
+    const turnPlayer = players.find(p => p.id === currentTurnPlayerId);
+    if (!turnPlayer) {
+      turnInfo.textContent = 'Waiting for players…';
+    } else if (isMyTurn) {
+      turnInfo.innerHTML = '<span class="my-turn">🎨 Your turn!</span> Draw one stroke and click "Done".';
+    } else {
+      turnInfo.innerHTML = `Currently drawing: <strong>${escapeHtml(turnPlayer.name)}</strong>`;
+    }
+
+    if (isMyTurn && !didStroke) {
+      lockBanner.classList.remove('visible');
+      canvas.classList.remove('locked');
+    } else if (isMyTurn && didStroke) {
+      lockBanner.classList.add('visible');
+      lockText.textContent = 'Done! Click "Pass it on".';
+      canvas.classList.add('locked');
+    } else {
+      lockBanner.classList.add('visible');
+      lockText.textContent = turnPlayer ? `Currently drawing: ${turnPlayer.name}` : 'Waiting…';
+      canvas.classList.add('locked');
+    }
+
+    doneBtn.disabled = !(isMyTurn && didStroke);
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+})();
+</script>
+</body>
+</html>
