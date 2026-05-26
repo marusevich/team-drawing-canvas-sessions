@@ -2,6 +2,7 @@ import { createClient, LiveList } from "https://esm.sh/@liveblocks/client?bundle
 
 const LIVEBLOCKS_PUBLIC_KEY = "pk_dev_fIzmJAtF9NWVLJO_NwwXNfDPlUX4hw0fYlA7XlrRMOiyidVQ1by_QyHbUJ91wP_g";
 const ROOM_PREFIX = "team-drawing-canvas-cat";
+const TURN_LIMIT = 3;
 const COLORS = ["#1c1e26", "#e25c5c", "#ee9c3a", "#2bb673", "#3d8de0", "#a64cd2"];
 
 const joinScreen = document.getElementById("joinScreen");
@@ -38,6 +39,7 @@ let root = null;
 let strokesList = null;
 let myId = null;
 let myName = "";
+let playerProfile = null;
 let players = [];
 let currentTurnIndex = 0;
 let currentTurnPlayerId = null;
@@ -126,6 +128,7 @@ async function join() {
   }
 
   myName = name;
+  playerProfile = getOrCreatePlayerProfile(sessionId);
   writeSessionToUrl(sessionId);
   updateSessionUi();
   joinBtn.disabled = true;
@@ -140,7 +143,11 @@ async function join() {
     });
 
     const entered = client.enterRoom(`${ROOM_PREFIX}-${sessionId}`, {
-      initialPresence: { name: myName },
+      initialPresence: {
+        name: myName,
+        playerId: playerProfile.id,
+        joinedAt: playerProfile.joinedAt,
+      },
       initialStorage: {
         strokes: new LiveList([]),
         currentTurnIndex: 0,
@@ -201,22 +208,26 @@ function refreshPlayers() {
   const nextPlayers = [];
 
   if (self) {
-    myId = self.connectionId;
+    myId = self.presence?.playerId || self.connectionId;
     nextPlayers.push({
-      id: self.connectionId,
+      id: myId,
+      connectionId: self.connectionId,
       name: self.presence?.name || myName || "You",
+      joinedAt: self.presence?.joinedAt || 0,
     });
   }
 
   for (const other of room.getOthers()) {
     nextPlayers.push({
-      id: other.connectionId,
+      id: other.presence?.playerId || other.connectionId,
+      connectionId: other.connectionId,
       name: other.presence?.name || "Player",
+      joinedAt: other.presence?.joinedAt || 0,
     });
   }
 
-  players = nextPlayers.sort((a, b) => a.id - b.id);
-  currentTurnPlayerId = players.length ? players[currentTurnIndex % players.length].id : null;
+  players = nextPlayers.sort((a, b) => a.joinedAt - b.joinedAt || String(a.id).localeCompare(String(b.id)));
+  currentTurnPlayerId = getCurrentTurnPlayer()?.id ?? null;
 
   if (currentTurnPlayerId !== previousTurnPlayerId) {
     previousTurnPlayerId = currentTurnPlayerId;
@@ -306,6 +317,7 @@ function canvasPos(event) {
 function pointerDown(event) {
   if (!room || !strokesList) return;
   if (currentTurnPlayerId !== myId || didStroke || activeStroke) return;
+  if (getTurnCount(myId) >= TURN_LIMIT) return;
 
   event.preventDefault();
   isDrawing = true;
@@ -364,7 +376,7 @@ window.addEventListener("touchend", pointerUp);
 
 doneBtn.addEventListener("click", () => {
   if (!root || players.length === 0) return;
-  root.set("currentTurnIndex", (currentTurnIndex + 1) % players.length);
+  passTurn();
   didStroke = false;
   updateUI();
 });
@@ -381,6 +393,7 @@ clearBtn.addEventListener("click", () => {
   while (strokesList.length > 0) {
     strokesList.delete(strokesList.length - 1);
   }
+  if (root) root.set("currentTurnIndex", 0);
   activeStroke = null;
   didStroke = false;
   room.broadcastEvent({ type: "stroke_cancel" });
@@ -398,6 +411,7 @@ function updateUI() {
   refreshPlayers();
 
   const isMyTurn = currentTurnPlayerId === myId;
+  const myTurnCount = getTurnCount(myId);
   playersBox.innerHTML = "";
 
   for (const player of players) {
@@ -405,26 +419,34 @@ function updateUI() {
     pill.className = "pill";
     if (player.id === currentTurnPlayerId) pill.classList.add("current");
     if (player.id === myId) pill.classList.add("me");
-    pill.textContent = player.name;
+    pill.textContent = `${player.name} ${getTurnCount(player.id)}/${TURN_LIMIT}`;
     playersBox.appendChild(pill);
   }
 
   const turnPlayer = players.find(player => player.id === currentTurnPlayerId);
 
-  if (!turnPlayer) {
+  if (!turnPlayer && players.length > 0) {
+    turnInfo.textContent = "All players have used their 3 turns.";
+  } else if (!turnPlayer) {
     turnInfo.textContent = root ? "Waiting for players…" : "Connecting…";
+  } else if (isMyTurn && myTurnCount < TURN_LIMIT) {
+    turnInfo.innerHTML = `<span class="my-turn">Your turn!</span> Draw one stroke and click "Done". ${TURN_LIMIT - myTurnCount} left.`;
   } else if (isMyTurn) {
-    turnInfo.innerHTML = '<span class="my-turn">Your turn!</span> Draw one stroke and click "Done".';
+    turnInfo.textContent = "You have used all 3 turns.";
   } else {
     turnInfo.innerHTML = `Currently drawing: <strong>${escapeHtml(turnPlayer.name)}</strong>`;
   }
 
-  if (isMyTurn && !didStroke) {
+  if (isMyTurn && !didStroke && myTurnCount < TURN_LIMIT) {
     lockBanner.classList.remove("visible");
     canvas.classList.remove("locked");
   } else if (isMyTurn && didStroke) {
     lockBanner.classList.add("visible");
     lockText.textContent = 'Done! Click "Pass it on".';
+    canvas.classList.add("locked");
+  } else if (isMyTurn) {
+    lockBanner.classList.add("visible");
+    lockText.textContent = "All 3 turns used.";
     canvas.classList.add("locked");
   } else {
     lockBanner.classList.add("visible");
@@ -433,6 +455,41 @@ function updateUI() {
   }
 
   doneBtn.disabled = !(isMyTurn && didStroke);
+}
+
+function getCurrentTurnPlayer() {
+  if (players.length === 0) return null;
+
+  for (let offset = 0; offset < players.length; offset += 1) {
+    const index = (currentTurnIndex + offset) % players.length;
+    const player = players[index];
+    if (getTurnCount(player.id) < TURN_LIMIT) return player;
+  }
+
+  return null;
+}
+
+function passTurn() {
+  if (!root || players.length === 0) return;
+
+  const startIndex = currentTurnPlayerId
+    ? players.findIndex(player => player.id === currentTurnPlayerId)
+    : currentTurnIndex;
+
+  for (let offset = 1; offset <= players.length; offset += 1) {
+    const index = ((startIndex < 0 ? currentTurnIndex : startIndex) + offset) % players.length;
+    if (getTurnCount(players[index].id) < TURN_LIMIT) {
+      root.set("currentTurnIndex", index);
+      return;
+    }
+  }
+
+  root.set("currentTurnIndex", currentTurnIndex);
+}
+
+function getTurnCount(playerId) {
+  if (!playerId) return 0;
+  return strokes.filter(stroke => stroke.playerId === playerId).length;
 }
 
 function escapeHtml(value) {
@@ -501,4 +558,22 @@ function normalizeSessionId(value) {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 40);
+}
+
+function getOrCreatePlayerProfile(value) {
+  const key = `team-drawing-canvas-player-${value}`;
+  const fallback = {
+    id: createSessionId(),
+    joinedAt: Date.now(),
+  };
+
+  try {
+    const stored = JSON.parse(localStorage.getItem(key) || "null");
+    if (stored?.id && stored?.joinedAt) return stored;
+    localStorage.setItem(key, JSON.stringify(fallback));
+  } catch {
+    return fallback;
+  }
+
+  return fallback;
 }
